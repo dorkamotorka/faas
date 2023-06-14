@@ -1,6 +1,6 @@
 FROM --platform=${BUILDPLATFORM:-linux/amd64} ghcr.io/openfaas/license-check:0.4.1 as license-check
 
-FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.19 as build
+FROM --platform=${BUILDPLATFORM:-linux/amd64} dorkamotorka/golang-port:1.19.2 as build
 
 ENV GO111MODULE=on
 ENV CGO_ENABLED=0

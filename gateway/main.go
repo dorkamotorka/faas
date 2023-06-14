@@ -280,5 +280,5 @@ func runMetricsServer() {
 		Handler:        router,
 	}
 
-	log.Fatal(s.ListenAndServe())
+	fmt.Println(s.ListenAndServe())
 }
