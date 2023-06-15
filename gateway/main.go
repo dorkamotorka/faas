@@ -13,6 +13,7 @@ import (
 
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/dorkamotorka/faas/gateway/ebpf"
 	"github.com/dorkamotorka/faas/gateway/xdp"
 
 	"github.com/gorilla/mux"

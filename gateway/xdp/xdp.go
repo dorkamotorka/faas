@@ -25,9 +25,11 @@ Fedora Linux, this can be done by running `ulimit -l <new-limit>` command, or
 to make it permanent, by creating a file at
 `/etc/security/limits.d/50-lockedmem.conf` with e.g. the following contents
 (1MiB should be enough for this package):
-	* - lockedmem 1048576
+  - - lockedmem 1048576
+
 logging out and logging back in.
 When you hit this limit, you'll get an error that looks like this:
+
 	error: failed to create an XDP socket: ebpf.NewMap qidconf_map failed: map create: operation not permitted
 
 Here is a minimal example of a program which receives network frames,

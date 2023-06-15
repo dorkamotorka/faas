@@ -15,7 +15,7 @@ ARG VERSION
 
 COPY --from=license-check /license-check /usr/bin/
 
-WORKDIR /go/src/github.com/openfaas/faas/gateway
+WORKDIR /go/src/github.com/dorkamotorka/faas/gateway
 
 COPY vendor         vendor
 COPY go.mod         go.mod
@@ -24,6 +24,9 @@ COPY go.sum         go.sum
 COPY handlers       handlers
 COPY metrics        metrics
 COPY requests       requests
+
+COPY xdp	    xdp
+COPY ebpf	    ebpf
 
 COPY types          types
 COPY plugin         plugin
@@ -39,18 +42,18 @@ RUN test -z "$(gofmt -l $(find . -type f -name '*.go' -not -path "./vendor/*"))"
 RUN go test $(go list ./... | grep -v integration | grep -v /vendor/ | grep -v /template/) -cover
 
 RUN CGO_ENABLED=${CGO_ENABLED} GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build --ldflags "-s -w \
-    -X \"github.com/openfaas/faas/gateway/version.GitCommitSHA=${GIT_COMMIT}\" \
-    -X \"github.com/openfaas/faas/gateway/version.Version=${VERSION}\" \
-    -X github.com/openfaas/faas/gateway/types.Arch=${TARGETARCH}" \
+    -X \"github.com/dorkamotorka/faas/gateway/version.GitCommitSHA=${GIT_COMMIT}\" \
+    -X \"github.com/dorkamotorka/faas/gateway/version.Version=${VERSION}\" \
+    -X github.com/dorkamotorka/faas/gateway/types.Arch=${TARGETARCH}" \
     -a -installsuffix cgo -o gateway .
 
 FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:3.17 as ship
 
 LABEL org.label-schema.license="MIT" \
-    org.label-schema.vcs-url="https://github.com/openfaas/faas" \
+    org.label-schema.vcs-url="https://github.com/dorkamotorka/faas" \
     org.label-schema.vcs-type="Git" \
-    org.label-schema.name="openfaas/faas" \
-    org.label-schema.vendor="openfaas" \
+    org.label-schema.name="dorkamotorka/faas" \
+    org.label-schema.vendor="dorkamotorka" \
     org.label-schema.docker.schema-version="1.0"
 
 LABEL org.opencontainers.image.source=https://github.com/openfaas/faas
@@ -66,7 +69,7 @@ EXPOSE 8082
 ENV http_proxy      ""
 ENV https_proxy     ""
 
-COPY --from=build /go/src/github.com/openfaas/faas/gateway/gateway    .
+COPY --from=build /go/src/github.com/dorkamotorka/faas/gateway/gateway    .
 COPY assets     assets
 
 ARG TARGETPLATFORM

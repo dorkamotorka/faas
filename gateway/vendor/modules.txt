@@ -1,6 +1,3 @@
-# github.com/asavie/xdp v0.3.3
-## explicit; go 1.13
-github.com/asavie/xdp
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -33,20 +30,26 @@ github.com/golang/protobuf/ptypes/timestamp
 # github.com/gorilla/mux v1.8.0
 ## explicit; go 1.12
 github.com/gorilla/mux
+# github.com/hashicorp/go-msgpack v1.1.5
+## explicit; go 1.13
+# github.com/klauspost/compress v1.16.5
+## explicit; go 1.18
+github.com/klauspost/compress/flate
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 ## explicit
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/nats-io/nats-server/v2 v2.9.11
+# github.com/nats-io/nats-server/v2 v2.9.18
 ## explicit; go 1.19
-# github.com/nats-io/nats-streaming-server v0.25.3
-## explicit; go 1.14
-# github.com/nats-io/nats.go v1.22.1
-## explicit; go 1.16
+# github.com/nats-io/nats-streaming-server v0.25.4
+## explicit; go 1.19
+# github.com/nats-io/nats.go v1.27.0
+## explicit; go 1.19
 github.com/nats-io/nats.go
 github.com/nats-io/nats.go/encoders/builtin
+github.com/nats-io/nats.go/internal/parser
 github.com/nats-io/nats.go/util
-# github.com/nats-io/nkeys v0.3.0
-## explicit; go 1.16
+# github.com/nats-io/nkeys v0.4.4
+## explicit; go 1.19
 github.com/nats-io/nkeys
 # github.com/nats-io/nuid v1.0.1
 ## explicit
@@ -60,6 +63,16 @@ github.com/nats-io/stan.go/pb
 github.com/openfaas/faas-provider/auth
 github.com/openfaas/faas-provider/httputil
 github.com/openfaas/faas-provider/types
+# github.com/openfaas/faas/gateway v0.0.0-20230607150711-910b8dae1bae
+## explicit; go 1.19
+github.com/openfaas/faas/gateway/handlers
+github.com/openfaas/faas/gateway/metrics
+github.com/openfaas/faas/gateway/pkg/middleware
+github.com/openfaas/faas/gateway/plugin
+github.com/openfaas/faas/gateway/requests
+github.com/openfaas/faas/gateway/scaling
+github.com/openfaas/faas/gateway/types
+github.com/openfaas/faas/gateway/version
 # github.com/openfaas/nats-queue-worker v0.0.0-20230117214128-3615ccb286cc
 ## explicit; go 1.18
 github.com/openfaas/nats-queue-worker/handler
@@ -77,12 +90,12 @@ github.com/prometheus/client_model/go
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.8.0
-## explicit; go 1.17
+# github.com/prometheus/procfs v0.9.0
+## explicit; go 1.18
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/stretchr/testify v1.7.1
+# github.com/stretchr/testify v1.8.2
 ## explicit; go 1.13
 # github.com/vishvananda/netlink v1.1.0
 ## explicit; go 1.12
@@ -95,14 +108,23 @@ github.com/vishvananda/netns
 ## explicit; go 1.13
 go.uber.org/goleak
 go.uber.org/goleak/internal/stack
-# golang.org/x/crypto v0.5.0
+# golang.org/x/crypto v0.9.0
 ## explicit; go 1.17
+golang.org/x/crypto/blake2b
+golang.org/x/crypto/curve25519
+golang.org/x/crypto/curve25519/internal/field
 golang.org/x/crypto/ed25519
+golang.org/x/crypto/internal/alias
+golang.org/x/crypto/internal/poly1305
+golang.org/x/crypto/nacl/box
+golang.org/x/crypto/nacl/secretbox
+golang.org/x/crypto/salsa20/salsa
 # golang.org/x/sync v0.1.0
 ## explicit
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.4.1-0.20230105183443-b8be2fde2a9e
+# golang.org/x/sys v0.8.0
 ## explicit; go 1.17
+golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
