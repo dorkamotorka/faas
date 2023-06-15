@@ -28,6 +28,19 @@ import (
 	natsHandler "github.com/openfaas/nats-queue-worker/handler"
 )
 
+func event(rd *ringbuf.Reader) {
+	for {
+		record, err := rd.Read()
+		if err != nil {
+			panic(err)
+		}
+
+		// Data is padded with 0 for alignment
+		fmt.Println("Sample:", record.RawSample)
+		fmt.Println("Event triggered!!!-----------------------------------HURAA--------------------")
+	}
+}
+
 // NameExpression for a function / service
 const NameExpression = "-a-zA-Z_0-9."
 
@@ -45,6 +58,7 @@ func main() {
 
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
+		fmt.Println("Problem is here!")
 		log.Fatal(err)
 	}
 
@@ -88,6 +102,7 @@ func main() {
 	}
 	defer rd.Close()
 
+	go event(rd)
 	/* BPF SETUP */
 
 	osEnv := types.OsEnv{}
@@ -321,7 +336,7 @@ func main() {
 		Handler:        r,
 	}
 
-	log.Fatal(s.ListenAndServe())
+	fmt.Println(s.ListenAndServe())
 }
 
 // runMetricsServer Listen on a separate HTTP port for Prometheus metrics to keep this accessible from

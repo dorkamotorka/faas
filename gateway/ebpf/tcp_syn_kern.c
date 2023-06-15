@@ -66,7 +66,7 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
    bpf_printk("ece=%d, cwr=%d, syn=%d\n", tcp->ece, tcp->cwr, tcp->syn);
    */
    // Forward TCP Packets from specific port only
-   if (bpf_ntohs(tcp->dest) == 7777) {
+   if (bpf_ntohs(tcp->dest) == 8080) {
       unsigned char buf[] = {1, 1, 1, 2, 2};
       int ret = bpf_ringbuf_output(&events, &buf[0], sizeof(buf), 0);
 

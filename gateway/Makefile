@@ -2,20 +2,19 @@ export DOCKER_CLI_EXPERIMENTAL=enabled
 
 PLATFORM := "linux/amd64,linux/arm/v7,linux/arm64"
 
-TAG?=latest
-SERVER?=docker.io
-OWNER?=alexellis2
+TAG?=0.2
+OWNER?=dorkamotorka
 NAME=gateway
 
 .PHONY: local-docker
 build-local:
-	@echo $(SERVER)/$(OWNER)/$(NAME):$(TAG) \
+	@echo $(OWNER)/$(NAME):$(TAG) \
 	&& docker buildx create --use --name=multiarch --node multiarch \
 	&& docker buildx build \
 		--progress=plain \
 		--platform linux/amd64 \
 		--output "type=docker,push=false" \
-		--tag $(SERVER)/$(OWNER)/$(NAME):$(TAG) .
+		--tag $(OWNER)/$(NAME):$(TAG) .
 
 .PHONY: push-docker
 push-docker:
@@ -25,4 +24,4 @@ push-docker:
 		--progress=plain \
 		--platform $(PLATFORM) \
 		--output "type=image,push=true" \
-		--tag $(SERVER)/$(OWNER)/$(NAME):$(TAG) .
+		--tag $(OWNER)/$(NAME):$(TAG) .
