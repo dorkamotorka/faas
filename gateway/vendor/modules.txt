@@ -1,9 +1,23 @@
+# github.com/asavie/xdp v0.3.3
+## explicit; go 1.13
+github.com/asavie/xdp
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
 # github.com/cespare/xxhash/v2 v2.1.2
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
+# github.com/cilium/ebpf v0.10.0
+## explicit; go 1.18
+github.com/cilium/ebpf
+github.com/cilium/ebpf/asm
+github.com/cilium/ebpf/btf
+github.com/cilium/ebpf/internal
+github.com/cilium/ebpf/internal/epoll
+github.com/cilium/ebpf/internal/sys
+github.com/cilium/ebpf/internal/unix
+github.com/cilium/ebpf/ringbuf
+github.com/cilium/ebpf/rlimit
 # github.com/docker/distribution v2.8.1+incompatible
 ## explicit
 github.com/docker/distribution/uuid
@@ -70,6 +84,13 @@ github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
 # github.com/stretchr/testify v1.7.1
 ## explicit; go 1.13
+# github.com/vishvananda/netlink v1.1.0
+## explicit; go 1.12
+github.com/vishvananda/netlink
+github.com/vishvananda/netlink/nl
+# github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
+## explicit; go 1.12
+github.com/vishvananda/netns
 # go.uber.org/goleak v1.1.12
 ## explicit; go 1.13
 go.uber.org/goleak

@@ -7,3 +7,4 @@ certifier
 /contrib/staging/
 **/*.sha256
 .vagrant
+*.swp
