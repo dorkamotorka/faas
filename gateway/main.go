@@ -29,6 +29,7 @@ import (
 )
 
 func event(rd *ringbuf.Reader) {
+	fmt.Println("Inside the event function-----------------")
 	for {
 		record, err := rd.Read()
 		if err != nil {
@@ -39,13 +40,13 @@ func event(rd *ringbuf.Reader) {
 		fmt.Println("Sample:", record.RawSample)
 		fmt.Println("Event triggered!!!-----------------------------------HURAA--------------------")
 	}
+	fmt.Println("Going out of the event function-----------------")
 }
 
 // NameExpression for a function / service
 const NameExpression = "-a-zA-Z_0-9."
 
 func main() {
-
 	/* BPF SETUP */
 	var linkName string
 	var queueID int
@@ -70,6 +71,10 @@ func main() {
 	}
 
 	Ifindex := -1
+	linkName = interfaces[0].Name
+	if linkName == "lo" {
+		linkName = interfaces[1].Name
+	}
 	for _, iface := range interfaces {
 		if iface.Name == linkName {
 			Ifindex = iface.Index

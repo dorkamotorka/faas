@@ -58,12 +58,6 @@ LABEL org.label-schema.license="MIT" \
 
 LABEL org.opencontainers.image.source=https://github.com/openfaas/faas
 
-RUN addgroup -S app \
-    && adduser -S -g app app \
-    && apk add --no-cache ca-certificates
-
-WORKDIR /home/app
-
 EXPOSE 8080
 EXPOSE 8082
 ENV http_proxy      ""
@@ -76,9 +70,4 @@ ARG TARGETPLATFORM
 
 RUN if [ "$TARGETPLATFORM" = "linux/arm/v7" ] ; then sed -ie s/x86_64/armhf/g assets/script/funcstore.js ; elif [ "$TARGETPLATFORM" = "linux/arm64" ] ; then sed -ie s/x86_64/arm64/g assets/script/funcstore.js; fi
 
-RUN chown -R app:app ./
-
-USER app
-
 CMD ["./gateway"]
-

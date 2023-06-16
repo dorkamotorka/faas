@@ -2,7 +2,7 @@ export DOCKER_CLI_EXPERIMENTAL=enabled
 
 PLATFORM := "linux/amd64,linux/arm/v7,linux/arm64"
 
-TAG?=0.2
+TAG?=0.16
 OWNER?=dorkamotorka
 NAME=gateway
 
