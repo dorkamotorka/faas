@@ -16,7 +16,7 @@ import (
 	"github.com/openfaas/faas/gateway/types"
 )
 
-// MakeForwardingProxyHandler create a handler which forwards HTTP requests
+// NOTE: MakeForwardingProxyHandler create a handler which forwards HTTP requests
 func MakeForwardingProxyHandler(proxy *types.HTTPClientReverseProxy,
 	notifiers []HTTPNotifier,
 	baseURLResolver middleware.BaseURLResolver,
@@ -39,6 +39,7 @@ func MakeForwardingProxyHandler(proxy *types.HTTPClientReverseProxy,
 
 		start := time.Now()
 
+		// NOTE: actually instantiates client and forwards request to the backend
 		statusCode, err := forwardRequest(w, r, proxy.Client, baseURL, requestURL, proxy.Timeout, writeRequestURI, serviceAuthInjector)
 
 		seconds := time.Since(start)

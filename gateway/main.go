@@ -4,6 +4,8 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -28,19 +30,54 @@ import (
 	natsHandler "github.com/openfaas/nats-queue-worker/handler"
 )
 
-func event(rd *ringbuf.Reader) {
-	fmt.Println("Inside the event function-----------------")
+func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReverseProxy /* b middleware.BaseURLResolver, u middleware.URLPathTransformer,*/, sai middleware.AuthInjector) {
+	fmt.Println("HEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEERRRRREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
 	for {
 		record, err := rd.Read()
 		if err != nil {
 			panic(err)
 		}
+		fmt.Println("Data received from the perf event:", record.RawSample)
 
-		// Data is padded with 0 for alignment
-		fmt.Println("Sample:", record.RawSample)
-		fmt.Println("Event triggered!!!-----------------------------------HURAA--------------------")
+		// create new http request
+		// TODO: Function name as an TCP payload
+		apiUrl := "http://faasd-provider:8081/system/function/env?namespace=openfaas-fn"
+		data := []byte("hello world")
+		request, _ := http.NewRequest("GET", apiUrl, bytes.NewBuffer(data))
+		request.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+		//baseURL := b.Resolve(request)
+		//originalURL := request.URL.String()
+		//requestURL := u.Transform(request)
+		writeRequestURI := true
+
+		//upstreamReq := buildUpstreamRequest(request, baseURL, requestURL)
+		upstreamReq := request
+		if upstreamReq.Body != nil {
+			defer upstreamReq.Body.Close()
+		}
+
+		if sai != nil {
+			sai.Inject(upstreamReq)
+		}
+
+		if writeRequestURI {
+			log.Printf("forwardRequest in the perf event: %s %s\n", upstreamReq.Host, upstreamReq.URL.String())
+		}
+
+		ctx, cancel := context.WithTimeout(request.Context(), proxy.Timeout)
+		defer cancel()
+
+		res, resErr := proxy.Client.Do(upstreamReq.WithContext(ctx))
+		if resErr != nil {
+			//badStatus := http.StatusBadGateway
+			fmt.Println("Client in the event, encountered an error")
+		} else {
+			fmt.Println("Client in the event, successfullz pre-warmed a container")
+			fmt.Printf("Response StatusCode is %d\n", res.StatusCode)
+		}
 	}
-	fmt.Println("Going out of the event function-----------------")
+	fmt.Println("EXXXITIING")
 }
 
 // NameExpression for a function / service
@@ -107,9 +144,6 @@ func main() {
 	}
 	defer rd.Close()
 
-	go event(rd)
-	/* BPF SETUP */
-
 	osEnv := types.OsEnv{}
 	readConfig := types.ReadConfig{}
 	config, configErr := readConfig.Read(osEnv)
@@ -154,6 +188,7 @@ func main() {
 	exporter.StartServiceWatcher(*config.FunctionsProviderURL, metricsOptions, "func", servicePollInterval)
 	metrics.RegisterExporter(exporter)
 
+	// NOTE: This is the HTTP client
 	reverseProxy := types.NewHTTPClientReverseProxy(config.FunctionsProviderURL,
 		config.UpstreamTimeout,
 		config.MaxIdleConns,
@@ -200,6 +235,7 @@ func main() {
 	functionAnnotationCache := scaling.NewFunctionCache(scalingConfig.CacheExpiry)
 	cachedFunctionQuery := scaling.NewCachedFunctionQuery(functionAnnotationCache, externalServiceQuery)
 
+	// NOTE: Instantiates proxy to the FaaS provider
 	faasHandlers.Proxy = handlers.MakeCallIDMiddleware(
 		handlers.MakeForwardingProxyHandler(reverseProxy, functionNotifiers, functionURLResolver, functionURLTransformer, nil),
 	)
@@ -340,6 +376,9 @@ func main() {
 		MaxHeaderBytes: http.DefaultMaxHeaderBytes, // 1MB - can be overridden by setting Server.MaxHeaderBytes.
 		Handler:        r,
 	}
+
+	go event(rd, s, reverseProxy /*urlResolver, functionURLResolver, functionURLTransformer,*/, serviceAuthInjector)
+	/* BPF event thread */
 
 	fmt.Println(s.ListenAndServe())
 }

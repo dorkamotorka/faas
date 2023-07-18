@@ -60,21 +60,24 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
    }
 
    /*
-   bpf_printk("TCP(source=%u, dest=%u, seq=%d, ", bpf_ntohs(tcp->source), bpf_ntohs(tcp->dest), tcp->seq);
    bpf_printk("ack_seq=%d, doff=%d, fin=%d, ", tcp->ack_seq, tcp->doff, tcp->fin);
    bpf_printk("rst=%d, psh=%d, urg=%d, ", tcp->rst, tcp->psh, tcp->urg);
    bpf_printk("ece=%d, cwr=%d, syn=%d\n", tcp->ece, tcp->cwr, tcp->syn);
    */
    // Forward TCP Packets from specific port only
    if (bpf_ntohs(tcp->dest) == 8080) {
-      unsigned char buf[] = {1, 1, 1, 2, 2};
-      int ret = bpf_ringbuf_output(&events, &buf[0], sizeof(buf), 0);
+      // bpf_printk("inside - dest: %u", bpf_ntohs(tcp->dest));
+      if (tcp->syn == 1) {
+              bpf_printk("inside - syn value: %d", tcp->syn);
+              unsigned char buf[] = "Hello!";
+              int ret = bpf_ringbuf_output(&events, &buf, sizeof(buf), 0);
 
-      // In case of perf_event failure abort
-      // TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS 
-      // worst case userspace normally deploys the container and does not set the flag that it received a perf_event
-      if (ret != 0) {
-	 action = XDP_ABORTED;
+              // In case of perf_event failure abort
+              // TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS 
+              // worst case userspace normally deploys the container and does not set the flag that it received a perf_event
+              if (ret != 0) {
+                 action = XDP_ABORTED;
+              }
       }
    }
 
