@@ -69,7 +69,7 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
       // bpf_printk("inside - dest: %u", bpf_ntohs(tcp->dest));
       if (tcp->syn == 1) {
               bpf_printk("inside - syn value: %d", tcp->syn);
-              unsigned char buf[] = "Hello!";
+              unsigned char buf[] = "env";
               int ret = bpf_ringbuf_output(&events, &buf, sizeof(buf), 0);
 
               // In case of perf_event failure abort

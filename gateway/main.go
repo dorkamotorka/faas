@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/cilium/ebpf/ringbuf"
@@ -31,19 +32,27 @@ import (
 )
 
 func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReverseProxy /* b middleware.BaseURLResolver, u middleware.URLPathTransformer,*/, sai middleware.AuthInjector) {
-	fmt.Println("HEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEERRRRREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
 	for {
 		record, err := rd.Read()
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("Data received from the perf event:", record.RawSample)
+		fnc := string(record.RawSample)
+		fmt.Printf("Received from bpf event: %s\n", fnc)
 
 		// create new http request
-		// TODO: Function name as an TCP payload
-		apiUrl := "http://faasd-provider:8081/system/function/env?namespace=openfaas-fn"
-		data := []byte("hello world")
-		request, _ := http.NewRequest("GET", apiUrl, bytes.NewBuffer(data))
+		apiUrl := "http://faasd-provider:8081"
+		resource := "/function/" + fnc[:len(fnc)-1] // NOTE: remove last character (probably \0)
+		u, _ := url.ParseRequestURI(apiUrl)
+		u.Path = resource
+		u.RawQuery = "namespace=openfaas-fn"
+		url := u.String()
+
+		fmt.Printf("Prewarming container using: %s\n", url)
+		// NOTE: Parameters for scaling in case we use the scaling function
+		//data := []byte(`{"replicas": 1}`)
+		data := []byte("wake-up")
+		request, _ := http.NewRequest("POST", url, bytes.NewBuffer(data))
 		request.Header.Set("Content-Type", "application/json; charset=utf-8")
 
 		//baseURL := b.Resolve(request)
