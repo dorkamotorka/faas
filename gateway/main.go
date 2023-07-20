@@ -4,14 +4,14 @@
 package main
 
 import (
-	"bytes"
-	"context"
+	//"bytes"
+	//"context"
 	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
-	"net/url"
+	//"net/url"
 	"time"
 
 	"github.com/cilium/ebpf/ringbuf"
@@ -31,62 +31,27 @@ import (
 	natsHandler "github.com/openfaas/nats-queue-worker/handler"
 )
 
-func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReverseProxy /* b middleware.BaseURLResolver, u middleware.URLPathTransformer,*/, sai middleware.AuthInjector) {
+func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReverseProxy /* b middleware.BaseURLResolver, u middleware.URLPathTransformer,*/, sai middleware.AuthInjector, scaler scaling.FunctionScaler) {
 	for {
 		record, err := rd.Read()
 		if err != nil {
 			panic(err)
 		}
-		fnc := string(record.RawSample)
-		fmt.Printf("Received from bpf event: %s\n", fnc)
+		functionName := string(record.RawSample)
+		fmt.Printf("Received from bpf event: %s\n", functionName)
 
-		// create new http request
-		apiUrl := "http://faasd-provider:8081"
-		resource := "/function/" + fnc[:len(fnc)-1] // NOTE: remove last character (probably \0)
-		u, _ := url.ParseRequestURI(apiUrl)
-		u.Path = resource
-		u.RawQuery = "namespace=openfaas-fn"
-		url := u.String()
-
-		fmt.Printf("Prewarming container using: %s\n", url)
-		// NOTE: Parameters for scaling in case we use the scaling function
-		//data := []byte(`{"replicas": 1}`)
-		data := []byte("wake-up")
-		request, _ := http.NewRequest("POST", url, bytes.NewBuffer(data))
-		request.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-		//baseURL := b.Resolve(request)
-		//originalURL := request.URL.String()
-		//requestURL := u.Transform(request)
-		writeRequestURI := true
-
-		//upstreamReq := buildUpstreamRequest(request, baseURL, requestURL)
-		upstreamReq := request
-		if upstreamReq.Body != nil {
-			defer upstreamReq.Body.Close()
+		namespace := "openfaas-fn"
+		res := scaler.Scale(functionName, namespace)
+		if !res.Found {
+			errStr := fmt.Sprintf("error finding function %s.%s: %s", functionName, namespace, res.Error.Error())
+			log.Printf("Scaling: %s\n", errStr)
 		}
 
-		if sai != nil {
-			sai.Inject(upstreamReq)
-		}
-
-		if writeRequestURI {
-			log.Printf("forwardRequest in the perf event: %s %s\n", upstreamReq.Host, upstreamReq.URL.String())
-		}
-
-		ctx, cancel := context.WithTimeout(request.Context(), proxy.Timeout)
-		defer cancel()
-
-		res, resErr := proxy.Client.Do(upstreamReq.WithContext(ctx))
-		if resErr != nil {
-			//badStatus := http.StatusBadGateway
-			fmt.Println("Client in the event, encountered an error")
-		} else {
-			fmt.Println("Client in the event, successfullz pre-warmed a container")
-			fmt.Printf("Response StatusCode is %d\n", res.StatusCode)
+		if res.Error != nil {
+			errStr := fmt.Sprintf("error finding function %s.%s: %s", functionName, namespace, res.Error.Error())
+			log.Printf("Scaling: %s\n", errStr)
 		}
 	}
-	fmt.Println("EXXXITIING")
 }
 
 // NameExpression for a function / service
@@ -269,11 +234,13 @@ func main() {
 
 	functionProxy := faasHandlers.Proxy
 
-	if config.ScaleFromZero {
-		scalingFunctionCache := scaling.NewFunctionCache(scalingConfig.CacheExpiry)
-		scaler := scaling.NewFunctionScaler(scalingConfig, scalingFunctionCache)
-		functionProxy = handlers.MakeScalingHandler(functionProxy, scaler, scalingConfig, config.Namespace)
-	}
+	// TODO: Remove comments from this if!
+	//if config.ScaleFromZero {
+	scalingFunctionCache := scaling.NewFunctionCache(scalingConfig.CacheExpiry)
+	scaler := scaling.NewFunctionScaler(scalingConfig, scalingFunctionCache)
+	fmt.Println("Instantiating Scaling Handler.........")
+	functionProxy = handlers.MakeScalingHandler(functionProxy, scaler, scalingConfig, config.Namespace)
+	//}
 
 	if config.UseNATS() {
 		log.Println("Async enabled: Using NATS Streaming")
@@ -299,30 +266,33 @@ func main() {
 	faasHandlers.ListFunctions = metrics.AddMetricsHandler(faasHandlers.ListFunctions, prometheusQuery)
 	faasHandlers.ScaleFunction = scaling.MakeHorizontalScalingHandler(handlers.MakeForwardingProxyHandler(reverseProxy, forwardingNotifiers, urlResolver, nilURLTransformer, serviceAuthInjector))
 
-	if credentials != nil {
-		faasHandlers.Alert =
-			auth.DecorateWithBasicAuth(faasHandlers.Alert, credentials)
-		faasHandlers.UpdateFunction =
-			auth.DecorateWithBasicAuth(faasHandlers.UpdateFunction, credentials)
-		faasHandlers.DeleteFunction =
-			auth.DecorateWithBasicAuth(faasHandlers.DeleteFunction, credentials)
-		faasHandlers.DeployFunction =
-			auth.DecorateWithBasicAuth(faasHandlers.DeployFunction, credentials)
-		faasHandlers.ListFunctions =
-			auth.DecorateWithBasicAuth(faasHandlers.ListFunctions, credentials)
-		faasHandlers.ScaleFunction =
-			auth.DecorateWithBasicAuth(faasHandlers.ScaleFunction, credentials)
-		faasHandlers.FunctionStatus =
-			auth.DecorateWithBasicAuth(faasHandlers.FunctionStatus, credentials)
-		faasHandlers.InfoHandler =
-			auth.DecorateWithBasicAuth(faasHandlers.InfoHandler, credentials)
-		faasHandlers.SecretHandler =
-			auth.DecorateWithBasicAuth(faasHandlers.SecretHandler, credentials)
-		faasHandlers.LogProxyHandler =
-			auth.DecorateWithBasicAuth(faasHandlers.LogProxyHandler, credentials)
-		faasHandlers.NamespaceListerHandler =
-			auth.DecorateWithBasicAuth(faasHandlers.NamespaceListerHandler, credentials)
-	}
+	// TODO: Remove comments from this if!
+	/*
+		if credentials != nil {
+			faasHandlers.Alert =
+				auth.DecorateWithBasicAuth(faasHandlers.Alert, credentials)
+			faasHandlers.UpdateFunction =
+				auth.DecorateWithBasicAuth(faasHandlers.UpdateFunction, credentials)
+			faasHandlers.DeleteFunction =
+				auth.DecorateWithBasicAuth(faasHandlers.DeleteFunction, credentials)
+			faasHandlers.DeployFunction =
+				auth.DecorateWithBasicAuth(faasHandlers.DeployFunction, credentials)
+			faasHandlers.ListFunctions =
+				auth.DecorateWithBasicAuth(faasHandlers.ListFunctions, credentials)
+			faasHandlers.ScaleFunction =
+				auth.DecorateWithBasicAuth(faasHandlers.ScaleFunction, credentials)
+			faasHandlers.FunctionStatus =
+				auth.DecorateWithBasicAuth(faasHandlers.FunctionStatus, credentials)
+			faasHandlers.InfoHandler =
+				auth.DecorateWithBasicAuth(faasHandlers.InfoHandler, credentials)
+			faasHandlers.SecretHandler =
+				auth.DecorateWithBasicAuth(faasHandlers.SecretHandler, credentials)
+			faasHandlers.LogProxyHandler =
+				auth.DecorateWithBasicAuth(faasHandlers.LogProxyHandler, credentials)
+			faasHandlers.NamespaceListerHandler =
+				auth.DecorateWithBasicAuth(faasHandlers.NamespaceListerHandler, credentials)
+		}
+	*/
 
 	r := mux.NewRouter()
 	// max wait time to start a function = maxPollCount * functionPollInterval
@@ -386,7 +356,7 @@ func main() {
 		Handler:        r,
 	}
 
-	go event(rd, s, reverseProxy /*urlResolver, functionURLResolver, functionURLTransformer,*/, serviceAuthInjector)
+	go event(rd, s, reverseProxy /*urlResolver, functionURLResolver, functionURLTransformer,*/, serviceAuthInjector, scaler)
 	/* BPF event thread */
 
 	fmt.Println(s.ListenAndServe())

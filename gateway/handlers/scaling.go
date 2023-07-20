@@ -23,6 +23,7 @@ func MakeScalingHandler(next http.HandlerFunc, scaler scaling.FunctionScaler, co
 
 		functionName, namespace := middleware.GetNamespace(defaultNamespace, middleware.GetServiceName(r.URL.String()))
 
+		fmt.Println("Calling Scale() function here!**************************")
 		res := scaler.Scale(functionName, namespace)
 
 		if !res.Found {
