@@ -32,7 +32,7 @@ import (
 	natsHandler "github.com/openfaas/nats-queue-worker/handler"
 )
 
-func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReverseProxy /* b middleware.BaseURLResolver, u middleware.URLPathTransformer,*/, sai middleware.AuthInjector, scaler scaling.FunctionScaler) {
+func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReverseProxy, sai middleware.AuthInjector, scaler scaling.FunctionScaler) {
 	for {
 		record, err := rd.Read()
 		if err != nil {
@@ -46,16 +46,17 @@ func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReversePro
 
 		namespace := "openfaas-fn"
 		// Non-blocking call to scale
-		res := scaler.Scale(functionName, namespace)
+		res := scaler.Scale("env", namespace)
 		if !res.Found {
 			errStr := fmt.Sprintf("error finding function %s.%s: %s", functionName, namespace, res.Error.Error())
-			log.Printf("Scaling: %s\n", errStr)
+			log.Printf("Scaling in RingBuf Event: %s\n", errStr)
 		}
 
 		if res.Error != nil {
 			errStr := fmt.Sprintf("error finding function %s.%s: %s", functionName, namespace, res.Error.Error())
-			log.Printf("Scaling: %s\n", errStr)
+			log.Printf("Scaling in RingBuf Event: %s\n", errStr)
 		}
+		fmt.Printf("Scale function in the RingBug Event returned - Available:  %t, Found: %t\n", res.Available, res.Found)
 	}
 }
 
@@ -367,7 +368,7 @@ func main() {
 		Handler:        r,
 	}
 
-	go event(rd, s, reverseProxy /*urlResolver, functionURLResolver, functionURLTransformer,*/, serviceAuthInjector, scaler)
+	go event(rd, s, reverseProxy, serviceAuthInjector, scaler)
 	/* BPF event thread */
 
 	fmt.Println(s.ListenAndServe())
