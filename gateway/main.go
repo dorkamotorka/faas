@@ -37,10 +37,14 @@ func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReversePro
 		if err != nil {
 			panic(err)
 		}
+
+		fmt.Println("Helllooooooooooo in the ringbuf Event")
+
 		functionName := string(record.RawSample)
 		fmt.Printf("Received from bpf event: %s\n", functionName)
 
 		namespace := "openfaas-fn"
+		// Non-blocking call to scale
 		res := scaler.Scale(functionName, namespace)
 		if !res.Found {
 			errStr := fmt.Sprintf("error finding function %s.%s: %s", functionName, namespace, res.Error.Error())

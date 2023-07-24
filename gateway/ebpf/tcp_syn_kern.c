@@ -10,11 +10,13 @@
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf.h> /* NOTE: THIS IS ACTUALLY linux/bpf.h BUT THE BPF_MAP_TYPE_RINGBUF IS MISSING THERE SO THIS IS LOCAL HEADER IN DIR /bpf! */
 #include "tcp_syn_kern.h"
+#include "common.h"
 
 struct bpf_map_def SEC("maps") events  = {
    .type = BPF_MAP_TYPE_RINGBUF,
    .max_entries = 256 * 1024 /* 256 KB */,
 };
+
 
 SEC("xdp_event") int perf_event_test(struct xdp_md *ctx) 
 {
@@ -29,6 +31,7 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
    struct ipv6hdr *ipv6;
    struct tcphdr *tcp;
 
+   bpf_printk("Parsing data-------------");	
    struct hdr_cursor nh;
    nh.pos = data;
 
@@ -58,9 +61,9 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
     action = XDP_ABORTED;
     goto out;
    }
+   bpf_printk("Data parsed-------------");	
 
    /*
-   bpf_printk("ack_seq=%d, doff=%d, fin=%d, ", tcp->ack_seq, tcp->doff, tcp->fin);
    bpf_printk("rst=%d, psh=%d, urg=%d, ", tcp->rst, tcp->psh, tcp->urg);
    bpf_printk("ece=%d, cwr=%d, syn=%d\n", tcp->ece, tcp->cwr, tcp->syn);
    */
@@ -69,13 +72,14 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
       // bpf_printk("inside - dest: %u", bpf_ntohs(tcp->dest));
       if (tcp->syn == 1) {
               bpf_printk("inside - syn value: %d", tcp->syn);
-              unsigned char buf[] = "env";
-              int ret = bpf_ringbuf_output(&events, &buf, sizeof(buf), 0);
-
-              // In case of perf_event failure abort
-              // TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS 
+	      unsigned char buf[] = "env";
+   	      bpf_printk("Submitting data-------------");
+	      int ret = bpf_ringbuf_output(&events, &buf, sizeof(buf), 0);
+   	      bpf_printk("Data submitted--------------");
+	       // In case of perf_event failure abort
+              // TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
               // worst case userspace normally deploys the container and does not set the flag that it received a perf_event
-              if (ret != 0) {
+	       if (ret != 0) {
                  action = XDP_ABORTED;
               }
       }
