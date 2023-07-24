@@ -91,5 +91,6 @@ func attachProgram(Ifindex int, program *ebpf.Program) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("XDP flags are: %d\n", int(DefaultXdpFlags))
 	return netlink.LinkSetXdpFdWithFlags(link, program.FD(), int(DefaultXdpFlags))
 }

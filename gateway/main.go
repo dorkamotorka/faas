@@ -18,6 +18,7 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/dorkamotorka/faas/gateway/ebpf"
 	"github.com/dorkamotorka/faas/gateway/xdp"
+	"golang.org/x/sys/unix"
 
 	"github.com/gorilla/mux"
 	"github.com/openfaas/faas-provider/auth"
@@ -71,6 +72,12 @@ func main() {
 	flag.StringVar(&linkName, "linkname", "lo", "The network link on which rebroadcast should run on.")
 	flag.IntVar(&queueID, "queueid", 0, "The ID of the Rx queue to which to attach to on the network link.")
 	flag.Parse()
+
+	// Set attachment type. Possible options:
+	// - unix.XDP_FLAGS_DRV_MODE
+	// - unix.XDP_FLAGS_SKB_MODE
+	// - unix.XDP_FLAGS_HW_MODE
+	xdp.DefaultXdpFlags = unix.XDP_FLAGS_DRV_MODE
 
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
