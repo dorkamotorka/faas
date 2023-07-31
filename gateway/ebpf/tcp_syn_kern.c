@@ -31,7 +31,6 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
    struct ipv6hdr *ipv6;
    struct tcphdr *tcp;
 
-   bpf_printk("Parsing data-------------");	
    struct hdr_cursor nh;
    nh.pos = data;
 
@@ -61,21 +60,15 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
     action = XDP_ABORTED;
     goto out;
    }
-   bpf_printk("Data parsed-------------");	
 
-   /*
-   bpf_printk("rst=%d, psh=%d, urg=%d, ", tcp->rst, tcp->psh, tcp->urg);
-   bpf_printk("ece=%d, cwr=%d, syn=%d\n", tcp->ece, tcp->cwr, tcp->syn);
-   */
    // Forward TCP Packets from specific port only
    if (bpf_ntohs(tcp->dest) == 8080) {
-      // bpf_printk("inside - dest: %u", bpf_ntohs(tcp->dest));
+      bpf_printk("inside - port value: %d", bpf_ntohs(tcp->dest));
       if (tcp->syn == 1) {
               bpf_printk("inside - syn value: %d", tcp->syn);
 	      unsigned char buf[] = "env";
-   	      bpf_printk("Submitting data-------------");
 	      int ret = bpf_ringbuf_output(&events, &buf, sizeof(buf), 0);
-   	      bpf_printk("Data submitted--------------");
+   	      bpf_printk("Perf Data SUBMIT to ringbuf!");
 	       // In case of perf_event failure abort
               // TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
               // worst case userspace normally deploys the container and does not set the flag that it received a perf_event

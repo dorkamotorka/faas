@@ -4,21 +4,14 @@
 package main
 
 import (
-	//"bytes"
-	//"context"
-	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
-	//"net/url"
 	"time"
 
 	"github.com/cilium/ebpf/ringbuf"
-	"github.com/cilium/ebpf/rlimit"
 	"github.com/dorkamotorka/faas/gateway/ebpf"
 	"github.com/dorkamotorka/faas/gateway/xdp"
-	"golang.org/x/sys/unix"
 
 	"github.com/gorilla/mux"
 	"github.com/openfaas/faas-provider/auth"
@@ -65,64 +58,15 @@ const NameExpression = "-a-zA-Z_0-9."
 
 func main() {
 	/* BPF SETUP */
-	var linkName string
-	var queueID int
-
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-
-	flag.StringVar(&linkName, "linkname", "lo", "The network link on which rebroadcast should run on.")
-	flag.IntVar(&queueID, "queueid", 0, "The ID of the Rx queue to which to attach to on the network link.")
-	flag.Parse()
-
-	// Set attachment type. Possible options:
-	// - unix.XDP_FLAGS_DRV_MODE
-	// - unix.XDP_FLAGS_SKB_MODE
-	// - unix.XDP_FLAGS_HW_MODE
-	xdp.DefaultXdpFlags = unix.XDP_FLAGS_DRV_MODE
-
-	// Allow the current process to lock memory for eBPF resources.
-	if err := rlimit.RemoveMemlock(); err != nil {
-		fmt.Println("Problem is here!")
-		log.Fatal(err)
-	}
-
-	interfaces, err := net.Interfaces()
-	//fmt.Println(interfaces)
-	if err != nil {
-		fmt.Printf("error: failed to fetch the list of network interfaces on the system: %v\n", err)
-		return
-	}
-
-	Ifindex := -1
-	linkName = interfaces[0].Name
-	if linkName == "lo" {
-		linkName = interfaces[1].Name
-	}
-	for _, iface := range interfaces {
-		if iface.Name == linkName {
-			Ifindex = iface.Index
-			break
-		}
-	}
-	if Ifindex == -1 {
-		fmt.Printf("error: couldn't find a suitable network interface to attach to\n")
-		return
-	}
-
+	// Only loads the program into kernel, but still needs to be attached to an interface manually
 	var program *xdp.Program
 	// Create a new XDP eBPF program and attach it to our chosen network link.
-	program, err = ebpf.NewTCPSynProgram(nil)
+	program, err := ebpf.NewTCPSynProgram(nil)
 	if err != nil {
 		fmt.Printf("error: failed to create xdp program: %v\n", err)
 		return
 	}
 	defer program.Close()
-
-	if err := program.Attach(Ifindex); err != nil {
-		fmt.Printf("error: failed to attach xdp program to interface: %v\n", err)
-		return
-	}
-	defer program.Detach(Ifindex)
 
 	rd, err := ringbuf.NewReader(program.Events)
 	if err != nil {
@@ -250,7 +194,6 @@ func main() {
 	//if config.ScaleFromZero {
 	scalingFunctionCache := scaling.NewFunctionCache(scalingConfig.CacheExpiry)
 	scaler := scaling.NewFunctionScaler(scalingConfig, scalingFunctionCache)
-	fmt.Println("Instantiating Scaling Handler.........")
 	functionProxy = handlers.MakeScalingHandler(functionProxy, scaler, scalingConfig, config.Namespace)
 	//}
 
