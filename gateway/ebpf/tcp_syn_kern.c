@@ -17,6 +17,19 @@ struct bpf_map_def SEC("maps") events  = {
    .max_entries = 256 * 1024 /* 256 KB */,
 };
 
+static __always_inline int check_function(const char* payload, const char* fnc)
+{
+    int i;
+    for (i = 0; payload[i] != '\0' && fnc[i] != '\0'; i++) {
+        if (payload[i] != fnc[i]) {
+            return 0; // Strings are different
+        }
+    }
+
+    // Check if both strings have reached their null-terminator
+    // If not, they have different lengths and are different strings
+    return (payload[i] == '\0' && fnc[i] == '\0');
+}
 
 SEC("xdp_event") int perf_event_test(struct xdp_md *ctx) 
 {
@@ -61,20 +74,29 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
     goto out;
    }
 
+   
    // Forward TCP Packets from specific port only
    if (bpf_ntohs(tcp->dest) == 8080) {
       bpf_printk("inside - port value: %d", bpf_ntohs(tcp->dest));
       if (tcp->syn == 1) {
               bpf_printk("inside - syn value: %d", tcp->syn);
-	      unsigned char buf[] = "env";
-	      int ret = bpf_ringbuf_output(&events, &buf, sizeof(buf), 0);
-   	      bpf_printk("Perf Data SUBMIT to ringbuf!");
-	       // In case of perf_event failure abort
-              // TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
-              // worst case userspace normally deploys the container and does not set the flag that it received a perf_event
-	       if (ret != 0) {
-                 action = XDP_ABORTED;
-              }
+	      // Need to check this otherwise BPF Verifier fails due to pointer dereferencing
+	      if (nh.pos != 0) {
+		      bpf_printk("Payload in the TCP SYN packet: %s", nh.pos);
+	
+		      unsigned char *payload = nh.pos;
+		      bpf_printk("Payload in the TCP SYN packet: %s", payload);
+		      unsigned char perf_data[] = "env";
+			int ret = bpf_ringbuf_output(&events, &perf_data, sizeof(perf_data), 0);
+			// In case of perf_event failure abort
+			// TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
+			// worst case userspace normally deploys the container and does not set the flag that it received a perf_event
+			if (ret != 0) {
+				action = XDP_ABORTED;
+			} else {
+				bpf_printk("PerfEvent Succesfully triggered using RingBuf!");
+			}
+	      }
       }
    }
 
