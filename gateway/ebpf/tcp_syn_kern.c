@@ -82,20 +82,27 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
               bpf_printk("inside - syn value: %d", tcp->syn);
 	      // Need to check this otherwise BPF Verifier fails due to pointer dereferencing
 	      if (nh.pos != 0) {
-		      bpf_printk("Payload in the TCP SYN packet: %s", nh.pos);
-	
-		      unsigned char *payload = nh.pos;
+		      const char *payload = nh.pos;
 		      bpf_printk("Payload in the TCP SYN packet: %s", payload);
-		      unsigned char perf_data[] = "env";
-			int ret = bpf_ringbuf_output(&events, &perf_data, sizeof(perf_data), 0);
-			// In case of perf_event failure abort
-			// TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
-			// worst case userspace normally deploys the container and does not set the flag that it received a perf_event
-			if (ret != 0) {
-				action = XDP_ABORTED;
-			} else {
-				bpf_printk("PerfEvent Succesfully triggered using RingBuf!");
-			}
+		      bpf_printk("Size of payload: %d", sizeof(payload));
+		      bpf_printk("Size of nh.pos: %d", sizeof(nh.pos));
+		      char perf_data[sizeof(payload)];
+		      bpf_printk("PerfData before: %s", perf_data);
+		      bpf_printk("%d", data_end - nh.pos);
+		      bpf_printk("Packet size: %d", data_end - data);
+		      if (nh.pos + sizeof(payload) <= data_end) {
+			      __builtin_memcpy(perf_data, payload, sizeof(payload)); 
+			      bpf_printk("PerfData after: %s", perf_data);
+			      int ret = bpf_ringbuf_output(&events, &perf_data, sizeof(perf_data), 0);
+				// In case of perf_event failure abort
+				// TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
+				// worst case userspace normally deploys the container and does not set the flag that it received a perf_event
+				if (ret != 0) {
+					action = XDP_ABORTED;
+				} else {
+					bpf_printk("PerfEvent Succesfully triggered using RingBuf!");
+				}
+		     }
 	      }
       }
    }
