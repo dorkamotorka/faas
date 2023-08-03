@@ -80,19 +80,21 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
       bpf_printk("inside - port value: %d", bpf_ntohs(tcp->dest));
       if (tcp->syn == 1) {
               bpf_printk("inside - syn value: %d", tcp->syn);
+
 	      // Need to check this otherwise BPF Verifier fails due to pointer dereferencing
 	      if (nh.pos != 0) {
 		      const char *payload = nh.pos;
 		      bpf_printk("Payload in the TCP SYN packet: %s", payload);
-		      bpf_printk("Size of payload: %d", sizeof(payload));
-		      bpf_printk("Size of nh.pos: %d", sizeof(nh.pos));
 		      char perf_data[sizeof(payload)];
-		      bpf_printk("PerfData before: %s", perf_data);
-		      bpf_printk("%d", data_end - nh.pos);
-		      bpf_printk("Packet size: %d", data_end - data);
+
+	      	      // Need to check this otherwise BPF Verifier fails due to potentially exceeding packet bounds
+		      // NOTE: The TCP SYN custom payload needs to be exactly 8 bytes in lenght, 
+		      // because the char pointer is of size 8 bytes,
+		      // and if the TCP SYN custom payload is less, the char pointer is actaully accessing the data out of packet bound which is prevented by the BPF verifier
+		      // This is possible, because the overall packet length (data_end - data) changes by changing the TCP packet, ie. the TCP SYN custom payload
 		      if (nh.pos + sizeof(payload) <= data_end) {
 			      __builtin_memcpy(perf_data, payload, sizeof(payload)); 
-			      bpf_printk("PerfData after: %s", perf_data);
+			      bpf_printk("PerfData: %s", perf_data);
 			      int ret = bpf_ringbuf_output(&events, &perf_data, sizeof(perf_data), 0);
 				// In case of perf_event failure abort
 				// TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS

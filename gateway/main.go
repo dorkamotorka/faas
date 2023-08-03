@@ -38,7 +38,7 @@ func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReversePro
 
 		namespace := "openfaas-fn"
 		// Non-blocking call to scale
-		res := scaler.Scale(functionName, namespace)
+		res := scaler.Scale(functionName[:len(functionName)-1], namespace) // Remove zero delimiter
 		if !res.Found {
 			errStr := fmt.Sprintf("error finding function %s.%s: %s", functionName, namespace, res.Error.Error())
 			log.Printf("Scaling in RingBuf Event: %s\n", errStr)
