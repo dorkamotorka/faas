@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cilium/ebpf/ringbuf"
@@ -32,13 +33,16 @@ func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReversePro
 			panic(err)
 		}
 
-		fmt.Printf("Received from bpf event: %v\n", record.RawSample)
-		functionName := string(record.RawSample)
-		fmt.Printf("Received from bpf event: %s\n", functionName)
+		arg := string(record.RawSample)
+		fmt.Printf("Received from bpf event:  %#v\n", arg)
+
+		// Remove padding
+		functionName := strings.ReplaceAll(arg, "\x00", "")
+		fmt.Printf("Received from bpf event:  %#v\n", functionName)
 
 		namespace := "openfaas-fn"
 		// Non-blocking call to scale
-		res := scaler.Scale(functionName[:len(functionName)-1], namespace) // Remove zero delimiter
+		res := scaler.Scale(functionName, namespace)
 		if !res.Found {
 			errStr := fmt.Sprintf("error finding function %s.%s: %s", functionName, namespace, res.Error.Error())
 			log.Printf("Scaling in RingBuf Event: %s\n", errStr)
