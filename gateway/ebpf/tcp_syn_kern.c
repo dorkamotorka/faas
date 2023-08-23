@@ -17,20 +17,6 @@ struct bpf_map_def SEC("maps") events  = {
    .max_entries = 256 * 1024 /* 256 KB */,
 };
 
-static __always_inline int check_function(const char* payload, const char* fnc)
-{
-    int i;
-    for (i = 0; payload[i] != '\0' && fnc[i] != '\0'; i++) {
-        if (payload[i] != fnc[i]) {
-            return 0; // Strings are different
-        }
-    }
-
-    // Check if both strings have reached their null-terminator
-    // If not, they have different lengths and are different strings
-    return (payload[i] == '\0' && fnc[i] == '\0');
-}
-
 SEC("xdp_event") int perf_event_test(struct xdp_md *ctx) 
 {
    // redirect packets to an xdp socket that match the given IPv4 or IPv6 protocol; pass all other packets to the kernel
@@ -74,39 +60,40 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
     goto out;
    }
 
-   
    // Forward TCP Packets from specific port only
    if (bpf_ntohs(tcp->dest) == 8080) {
-      bpf_printk("inside - port value: %d", bpf_ntohs(tcp->dest));
-      if (tcp->syn == 1) {
-              bpf_printk("inside - syn value: %d", tcp->syn);
-
-	      // Need to check this otherwise BPF Verifier fails due to pointer dereferencing
-	      if (nh.pos != 0) {
-		      const char *payload = nh.pos;
-		      bpf_printk("Payload in the TCP SYN packet: %s", payload);
-		      char perf_data[sizeof(payload)];
-
-	      	      // Need to check this otherwise BPF Verifier fails due to potentially exceeding packet bounds
-		      // NOTE: The TCP SYN custom payload needs to be exactly 8 bytes in lenght, 
-		      // because the char pointer is of size 8 bytes,
-		      // and if the TCP SYN custom payload is less, the char pointer is actaully accessing the data out of packet bound which is prevented by the BPF verifier
-		      // This is possible, because the overall packet length (data_end - data) changes by changing the TCP packet, ie. the TCP SYN custom payload
-		      if (nh.pos + sizeof(payload) <= data_end) {
-			      __builtin_memcpy(perf_data, payload, sizeof(payload)); 
-			      bpf_printk("PerfData: %s", perf_data);
-			      int ret = bpf_ringbuf_output(&events, &perf_data, sizeof(perf_data), 0);
-				// In case of perf_event failure abort
-				// TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
-				// worst case userspace normally deploys the container and does not set the flag that it received a perf_event
-				if (ret != 0) {
-					action = XDP_ABORTED;
-				} else {
-					bpf_printk("PerfEvent Succesfully triggered using RingBuf!");
-				}
-		     }
-	      }
-      }
+	   bpf_printk("inside - port value: %d", bpf_ntohs(tcp->dest));
+	   if (tcp->syn == 1) {
+		   bpf_printk("inside - syn value: %d", tcp->syn);
+		   
+		   // Need to check this otherwise BPF Verifier fails due to pointer dereferencing
+		   if (nh.pos != 0) {
+			   const char *payload = nh.pos;
+			   bpf_printk("Payload in the TCP SYN packet: %s", payload);
+			   char perf_data[sizeof(payload)];
+			   
+			   // Need to check this otherwise BPF Verifier fails due to potentially exceeding packet bounds
+			   // NOTE: The TCP SYN custom payload needs to be exactly 8 bytes in lenght, 
+			   // because the char pointer is of size 8 bytes,
+			   // and if the TCP SYN custom payload is less, the char pointer is actaully accessing the data out of packet bound 
+			   // which is prevented by the BPF verifier
+			   // This is possible, because the overall packet length (data_end - data) changes by changing the TCP packet, 
+			   // ie. the TCP SYN custom payload
+			   if (nh.pos + sizeof(payload) <= data_end) {
+				   __builtin_memcpy(perf_data, payload, sizeof(payload)); 
+				   bpf_printk("PerfData: %s", perf_data);
+				   int ret = bpf_ringbuf_output(&events, &perf_data, sizeof(perf_data), 0);
+				   // In case of perf_event failure abort
+				   // TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
+				   // worst case userspace normally deploys the container and does not set the flag that it received a perf_event
+				   if (ret != 0) {
+					   action = XDP_ABORTED;
+				   } else {
+					   bpf_printk("PerfEvent Succesfully triggered using RingBuf!");
+				   }
+			   }
+		   }
+	   }
    }
 
 out:
