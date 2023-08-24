@@ -120,54 +120,54 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
 					if (len + 1 > data_end) {
 						break;
 					}
-					const unsigned int xlen = *len - 2;
-					//bpf_printk("[TCPOPTS] Found option length => %d! Option type => %d.\n", xlen, *val);
 
-					// 0xfd indicates a Experiment-1 TCP Option
-					if (*val == 0xfd) {
-						bpf_printk("[TCPOPTS] Found Experiment-1 TCP Option\n");
+					if (*len > 0) {
+						// 0xfd indicates a Experiment-1 TCP Option
+						if (*val == 0xfd) {
+							bpf_printk("[TCPOPTS] Found Experiment-1 TCP Option\n");
 
-						// Adjust by +2 = start of TCP Option data.
-						const char *payload = val + 2;
-						bpf_printk("Payload in the TCP Expriment Option: %s (length: %d)", payload, xlen);
+							// Adjust by +2 = start of TCP Option data.
+							const char *payload = val + 2;
+							const unsigned int xlen = *len - 2;
+							bpf_printk("Payload in the TCP Expriment Option: %s (length: %d)", payload, xlen);
 
-						// Need to check this otherwise BPF Verifier fails due to potentially exceeding packet bounds
-						// NOTE: The TCP SYN custom payload needs to be exactly 8 bytes in lenght, 
-						// because the char pointer is of size 8 bytes,
-						// and if the TCP SYN custom payload is less, the char pointer is actaully accessing the data out of packet bound 
-						// which is prevented by the BPF verifier
-						// This is possible, because the overall packet length (data_end - data) changes by changing the TCP packet, 
-						// ie. the TCP SYN custom payload
-						if (xlen > 0) {
-							if (payload + xlen <= data_end) {
-								unsigned char perf_data[3];
-								//bpf_printk("payload size: %d", sizeof(payload));
-								//bpf_printk("xlen size: %d", xlen);
-								if (payload != 0) {
-									if (payload + 3 <= data_end) {
-										__builtin_memcpy(perf_data, payload, 3); 
-										bpf_printk("Return: %s\n", perf_data);
-										int ret = bpf_ringbuf_output(&events, &perf_data, 3, 0);
+							// Need to check this otherwise BPF Verifier fails due to potentially exceeding packet bounds
+							// NOTE: The TCP SYN custom payload needs to be exactly 8 bytes in lenght, 
+							// because the char pointer is of size 8 bytes,
+							// and if the TCP SYN custom payload is less, the char pointer is actaully accessing the data out of packet bound 
+							// which is prevented by the BPF verifier
+							// This is possible, because the overall packet length (data_end - data) changes by changing the TCP packet, 
+							// ie. the TCP SYN custom payload
+							if (xlen > 0) {
+								if (payload + xlen <= data_end) {
+									if (payload != 0) {
+									// NOTE: This is a limitation
+									unsigned char perf_data[3];
+									unsigned int l = 3;
+										if (payload + l <= data_end) {
+											__builtin_memcpy(perf_data, payload, l); 
+											if (perf_data != 0) {
+												bpf_printk("Return: %s\n", perf_data);
+												int ret = bpf_ringbuf_output(&events, &perf_data, l, 0);
+												// In case of perf_event failure abort
+												// TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
+												// worst case userspace normally deploys the container and does not set the flag that it received a perf_event
+												if (ret != 0) {
+													action = XDP_ABORTED;
+												} else {
+													bpf_printk("PerfEvent Succesfully triggered using RingBuf!");
+												}
+												goto out;
+											}
+										}
 									}
 								}
-							/*
-								
-								// In case of perf_event failure abort
-								// TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
-								// worst case userspace normally deploys the container and does not set the flag that it received a perf_event
-								if (ret != 0) {
-									action = XDP_ABORTED;
-								} else {
-									bpf_printk("PerfEvent Succesfully triggered using RingBuf!");
-								}
-								goto out;
-							*/
 							}
 						}
+						// Increment optdata by the option's length.
+						//optdata += (*len > 0) ? *len : 1;
+						//continue;
 					}
-					// Increment optdata by the option's length.
-					//optdata += (*len > 0) ? *len : 1;
-					//continue;
 				}
 				optdata++;
 			}

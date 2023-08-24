@@ -34,11 +34,11 @@ func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReversePro
 		}
 
 		arg := string(record.RawSample)
-		fmt.Printf("Received from bpf event:  %#v\n", arg)
+		fmt.Printf("Received from bpf event =>  %#v\n", arg)
 
 		// Remove padding
 		functionName := strings.ReplaceAll(arg, "\x00", "")
-		fmt.Printf("Received from bpf event:  %#v\n", functionName)
+		fmt.Printf("Function to call =>  %#v\n", functionName)
 
 		namespace := "openfaas-fn"
 		// Non-blocking call to scale
