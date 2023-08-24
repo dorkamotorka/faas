@@ -174,7 +174,8 @@ static __always_inline int parse_udphdr(struct hdr_cursor *nh,
 
 static __always_inline int parse_tcphdr(struct hdr_cursor *nh,
 					void *data_end,
-					struct tcphdr **tcphdr)
+					struct tcphdr **tcphdr, 
+					unsigned char **payload)
 {
 	int len;
 	struct tcphdr *h = nh->pos;
@@ -237,15 +238,11 @@ static __always_inline int parse_tcphdr(struct hdr_cursor *nh,
 					// 0xfd indicates a Experiment-1 TCP Option
 					if (*val == 0xfd) {
 						bpf_printk("[TCPOPTS] Found Experiment-1 TCP Option\n");
-
-						unsigned char *explen = val + 1;
-						if (explen + 1 > data_end) {
-							break;
-						}
+						
 						// Adjust by +2 = start of TCP Option data.
 						unsigned char *payload = val + 2;
 						bpf_printk("Payload in the TCP Expriment Option: %s", payload);
-						char function[sizeof(len)]; // TODO: Function name limit!
+						char function[sizeof(len)];
 						if (payload + sizeof(payload) <= data_end) {
 							__builtin_memcpy(function, payload, sizeof(payload));
 							//function[sizeof(payload)] = "\0"; // Null-terminate the string
