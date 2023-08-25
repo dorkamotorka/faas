@@ -172,10 +172,12 @@ static __always_inline int parse_udphdr(struct hdr_cursor *nh,
 	return len;
 }
 
+/*
+ * parse_tcphdr: parse and return the length of the tcp header
+ */
 static __always_inline int parse_tcphdr(struct hdr_cursor *nh,
 					void *data_end,
-					struct tcphdr **tcphdr, 
-					unsigned char **payload)
+					struct tcphdr **tcphdr)
 {
 	int len;
 	struct tcphdr *h = nh->pos;
@@ -191,72 +193,6 @@ static __always_inline int parse_tcphdr(struct hdr_cursor *nh,
 	/* Variable-length TCP header, need to use byte-based arithmetic */
 	if (nh->pos + len > data_end)
 		return -1;
-
-	// Parse TCP Options
-	if (h->doff > 5) {
-		if (h->syn == 1) {
-			bpf_printk("[TCPOPTS] Have TCP header options. Header length => %d. Beginning to parse options.\n", len);
-			unsigned char *opts = nh->pos + 20; // +20 because this is where the TCP Option part of the TCP packet starts
-			if (opts + 1 > data_end) {
-			    return -1;
-			}
-
-			unsigned int optdata = 0;
-			while (optdata <= 40) {
-				// Initialize the byte we're parsing and ensure it isn't outside of data_end.
-				unsigned char *val = opts + optdata;
-
-				if (val + 1 > data_end) {
-					break;
-				}
-				bpf_printk("[TCPOPTS] Received %d as type code.\n", *val);
-				
-				// 0x00 indicates end of TCP header options, so break loop.
-				if (*val == 0x00) {
-					break;
-				}
-				// 0x01 indicates a NOP which must be skipped.
-				else if (*val == 0x01){
-					bpf_printk("[TCPOPTS] Skipping NOP.\n");
-					optdata++;
-					continue;
-				}
-				// NOTE: The Transmission Control Protocol (TCP) has provision for optional header fields identified by an option kind field.  
-				// Options 0 and 1 are exactly one octet which is their kind field.  
-				// All other options have their one octet kind field, followed by a one octet length field,
-				// followed by length-2 octets of option data.
-				// We need to increase by the option's length field for other options.
-				else {
-					bpf_printk("[TCPOPTS] Found another TCP option! Adjusting by its length.\n");
-					// Increase by option length (which is val + 1 since the option length is the second field).
-					unsigned char *len = val + 1;
-					if (len + 1 > data_end) {
-						break;
-					}
-					bpf_printk("[TCPOPTS] Found option length => %d! Option type => %d.\n", *len, *val);
-
-					// 0xfd indicates a Experiment-1 TCP Option
-					if (*val == 0xfd) {
-						bpf_printk("[TCPOPTS] Found Experiment-1 TCP Option\n");
-						
-						// Adjust by +2 = start of TCP Option data.
-						unsigned char *payload = val + 2;
-						bpf_printk("Payload in the TCP Expriment Option: %s", payload);
-						char function[sizeof(len)];
-						if (payload + sizeof(payload) <= data_end) {
-							__builtin_memcpy(function, payload, sizeof(payload));
-							//function[sizeof(payload)] = "\0"; // Null-terminate the string
-							bpf_printk("Function name is %s!\n", function);
-						}
-					}
-					// Increment optdata by the option's length.
-					//optdata += (*len > 0) ? *len : 1;
-					//continue;
-				}
-				optdata++;		
-			}
-		}
-	}
 
 	nh->pos += len;
 	*tcphdr = h;

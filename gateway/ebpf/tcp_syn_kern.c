@@ -12,6 +12,8 @@
 #include "tcp_syn_kern.h"
 #include "common.h"
 
+// #define DEBUG
+
 struct bpf_map_def SEC("maps") events  = {
    .type = BPF_MAP_TYPE_RINGBUF,
    .max_entries = 256 * 1024 /* 256 KB */,
@@ -55,16 +57,13 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
     goto out;
    }
 
-   /* ---------------------------------- PARSE TCP HEADER ---------------------------------- */
-   int len;
    struct tcphdr *h = nh.pos;
-
    if (h + 1 > data_end) {
     	action = XDP_ABORTED;
     	goto out;
    }
 
-   len = h->doff * 4;
+   int len = h->doff * 4;
    /* Sanity check packet field is valid */
    if(len < sizeof(*h)) {
     	action = XDP_ABORTED;
@@ -79,9 +78,13 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
 
    // Parse TCP Options
    if (h->doff > 5) {
+	// Parse only packet destined for port 8080
    	if (bpf_ntohs(h->dest) == 8080) {
+		// Parse only TCP SYN packets
 		if (h->syn == 1) {
-			bpf_printk("[TCPOPTS] Have TCP header options. Header length => %d. Beginning to parse options.\n", len);
+			#ifdef PRINT
+				bpf_printk("[TCPOPTS] Have TCP header options. Header length => %d. Beginning to parse options.\n", len);
+			#endif
 			unsigned char *opts = nh.pos + 20; // +20 because this is where the TCP Option part of the TCP packet starts
 			if (opts + 1 > data_end) {
 				action = XDP_ABORTED;
@@ -92,11 +95,12 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
 			while (optdata <= 40) {
 				// Initialize the byte we're parsing and ensure it isn't outside of data_end.
 				unsigned char *val = opts + optdata;
-
 				if (val + 1 > data_end) {
 					break;
 				}
-				bpf_printk("[TCPOPTS] Received %d as type code.\n", *val);
+				#ifdef PRINT
+					bpf_printk("[TCPOPTS] Received %d as type code.\n", *val);
+				#endif
 
 				// 0x00 indicates end of TCP header options, so break loop.
 				if (*val == 0x00) {
@@ -104,7 +108,9 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
 				}
 				// 0x01 indicates a NOP which must be skipped.
 				else if (*val == 0x01){
-					bpf_printk("[TCPOPTS] Skipping NOP.\n");
+					#ifdef PRINT
+						bpf_printk("[TCPOPTS] Skipping NOP.\n");
+					#endif
 					optdata++;
 					continue;
 				}
@@ -114,59 +120,58 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
 				// followed by (length - 2) octets of option data.
 				// We need to increase by the option's length field for other options.
 				else {
-					//bpf_printk("[TCPOPTS] Found another TCP option! Adjusting by its length.\n");
 					// Increase by option length (which is val + 1 since the option length is the second field).
 					unsigned char *len = val + 1;
 					if (len + 1 > data_end) {
 						break;
 					}
 
-					if (*len > 0) {
-						// 0xfd indicates a Experiment-1 TCP Option
-						if (*val == 0xfd) {
+					// 0xfd indicates a Experiment-1 TCP Option
+					if (*val == 0xfd) {
+						#ifdef PRINT
 							bpf_printk("[TCPOPTS] Found Experiment-1 TCP Option\n");
+						#endif
 
-							// Adjust by +2 = start of TCP Option data.
-							const char *payload = val + 2;
-							const unsigned int xlen = *len - 2;
+						// Adjust by +2 = start of TCP Option data.
+						const char *payload = val + 2;
+						const unsigned int xlen = *len - 2;
+						#ifdef PRINT
 							bpf_printk("Payload in the TCP Expriment Option: %s (length: %d)", payload, xlen);
+						#endif
 
-							// Need to check this otherwise BPF Verifier fails due to potentially exceeding packet bounds
-							// NOTE: The TCP SYN custom payload needs to be exactly 8 bytes in lenght, 
-							// because the char pointer is of size 8 bytes,
-							// and if the TCP SYN custom payload is less, the char pointer is actaully accessing the data out of packet bound 
-							// which is prevented by the BPF verifier
-							// This is possible, because the overall packet length (data_end - data) changes by changing the TCP packet, 
-							// ie. the TCP SYN custom payload
-							if (xlen > 0) {
-								if (payload + xlen <= data_end) {
-									if (payload != 0) {
-									// NOTE: This is a limitation
-									unsigned char perf_data[3];
-									unsigned int l = 3;
-										if (payload + l <= data_end) {
-											__builtin_memcpy(perf_data, payload, l); 
-											if (perf_data != 0) {
-												bpf_printk("Return: %s\n", perf_data);
-												int ret = bpf_ringbuf_output(&events, &perf_data, l, 0);
-												// In case of perf_event failure abort
-												// TODO: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
-												// worst case userspace normally deploys the container and does not set the flag that it received a perf_event
-												if (ret != 0) {
-													action = XDP_ABORTED;
-												} else {
-													bpf_printk("PerfEvent Succesfully triggered using RingBuf!");
-												}
-												goto out;
-											}
-										}
-									}
+						// Need to check this otherwise BPF Verifier fails due to potentially exceeding packet bounds
+						// NOTE: The TCP SYN custom payload needs to be exactly 8 bytes in lenght, 
+						// because the char pointer is of size 8 bytes,
+						// and if the TCP SYN custom payload is less, the char pointer is actaully accessing the data out of packet bound 
+						// which is prevented by the BPF verifier
+						// This is possible, because the overall packet length (data_end - data) changes by changing the TCP packet, 
+						// ie. the TCP SYN custom payload
+						if (payload + xlen <= data_end) {
+
+							// NOTE: This is a limitation - because BPF Program doesn't support Dynamic Stack Memory allocation, 
+							// so one needs to statically pre-compile time determine the amount of memory (actually the length of the function name)
+							// which limits it
+							unsigned char perf_data[3];
+							unsigned int l = 3;
+							if (payload + l <= data_end) {
+								// NOTE: memcpy operation is necessary because the bpf_ringbuf_output function is not allowed to access
+								// packet data directly, so we need to copy it to another variable instatiated on stack and forward that
+								__builtin_memcpy(perf_data, payload, l); 
+								#ifdef PRINT
+									bpf_printk("Perf Data (spurious output for whatever reason): %s\n", perf_data);
+								#endif
+								int ret = bpf_ringbuf_output(&events, &perf_data, l, 0);
+								
+								// NOTE: Probably this shouldn't impact the program and one should just pass the packet with XDP_PASS
+								// worst case userspace normally deploys the container and does not set the flag that it received a perf_event
+								if (ret != 0) {
+									action = XDP_ABORTED;
+								} else {
+									bpf_printk("XDP/BPF Succesfully forwarded function name => %s!", payload);
 								}
+								goto out;
 							}
 						}
-						// Increment optdata by the option's length.
-						//optdata += (*len > 0) ? *len : 1;
-						//continue;
 					}
 				}
 				optdata++;
@@ -174,7 +179,6 @@ SEC("xdp_event") int perf_event_test(struct xdp_md *ctx)
 		}
 	}
    }
-   /* ---------------------------------- PARSE TCP HEADER ---------------------------------- */
 
 out:
 	return action;
