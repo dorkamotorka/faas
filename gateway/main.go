@@ -3,16 +3,21 @@
 
 package main
 
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go coldy coldy.c
+
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
-	"strings"
+	"flag"
 	"time"
+	"encoding/binary"
 
+	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/ringbuf"
-	"github.com/dorkamotorka/faas/gateway/ebpf"
-	"github.com/dorkamotorka/faas/gateway/xdp"
+	"github.com/cilium/ebpf/link"
+	"github.com/cilium/ebpf/rlimit"
 
 	"github.com/gorilla/mux"
 	"github.com/openfaas/faas-provider/auth"
@@ -33,11 +38,10 @@ func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReversePro
 			panic(err)
 		}
 
-		arg := string(record.RawSample)
-		fmt.Printf("Received from bpf event =>  %#v\n", arg)
+		data := binary.LittleEndian.Uint32(record.RawSample)
+		fmt.Printf("Received from bpf event =>  %d\n", data)
 
-		// Remove padding
-		functionName := strings.ReplaceAll(arg, "\x00", "")
+		functionName := functionMap[int(data)]
 		fmt.Printf("Function to call =>  %#v\n", functionName)
 
 		namespace := "openfaas-fn"
@@ -59,19 +63,54 @@ func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReversePro
 // NameExpression for a function / service
 const NameExpression = "-a-zA-Z_0-9."
 
-func main() {
-	/* BPF SETUP */
-	// Only loads the program into kernel, but still needs to be attached to an interface manually
-	var program *xdp.Program
-	// Create a new XDP eBPF program and attach it to our chosen network link.
-	program, err := ebpf.NewTCPSynProgram(nil)
-	if err != nil {
-		fmt.Printf("error: failed to create xdp program: %v\n", err)
-		return
-	}
-	defer program.Close()
+var functionMap = map[int]string{8082: "env"}
 
-	rd, err := ringbuf.NewReader(program.Events)
+func main() {
+	// Remove resource limits for kernels <5.11.
+	if err := rlimit.RemoveMemlock(); err != nil {
+			log.Fatal("Removing memlock:", err)
+	}
+
+	var ifname string
+	flag.StringVar(&ifname, "i", "lo", "Network interface name where the eBPF program will be attached")
+	flag.Parse()
+
+	// Load the compiled eBPF ELF and load it into the kernel.
+	var objs coldyObjects
+	if err := loadColdyObjects(&objs, nil); err != nil {
+			log.Fatal("Loading eBPF objects:", err)
+	}
+	defer objs.Close()
+
+	iface, err := net.InterfaceByName(ifname)
+	if err != nil {
+			log.Fatalf("Getting interface %s: %s", ifname, err)
+	}
+
+	// Attach XDP program to the network interface.
+	xdplink, err := link.AttachXDP(link.XDPOptions{
+			Program:   objs.XdpIngress,
+			Interface: iface.Index,
+	})
+	if err != nil {
+			log.Fatal("Attaching XDP:", err)
+	}
+	defer xdplink.Close()
+
+	// Attach count_packets to the network interface.
+	tclink, err := link.AttachTCX(link.TCXOptions{
+		Program:   objs.TcEgress,
+		Attach:		 ebpf.AttachTCXEgress,
+		Interface: iface.Index,
+	})
+	if err != nil {
+			log.Fatal("Attaching TC:", err)
+	}
+	defer tclink.Close()
+
+	log.Printf("Doing port remapping on %s..", ifname)
+
+	rd, err := ringbuf.NewReader(objs.coldyMaps.Events)
 	if err != nil {
 		panic(err)
 	}

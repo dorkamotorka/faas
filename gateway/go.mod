@@ -1,9 +1,11 @@
 module github.com/dorkamotorka/faas/gateway
 
-go 1.19
+go 1.21.0
+
+toolchain go1.22.2
 
 require (
-	github.com/cilium/ebpf v0.10.0
+	github.com/cilium/ebpf v0.15.0
 	github.com/docker/distribution v2.8.1+incompatible
 	github.com/gorilla/mux v1.8.0
 	github.com/openfaas/faas-provider v0.19.1
@@ -11,10 +13,8 @@ require (
 	github.com/openfaas/nats-queue-worker v0.0.0-20230117214128-3615ccb286cc
 	github.com/prometheus/client_golang v1.13.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/vishvananda/netlink v1.1.0
 	go.uber.org/goleak v1.1.12
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.8.0
 )
 
 require (
@@ -34,7 +34,8 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/stretchr/testify v1.8.2 // indirect
-	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
 	golang.org/x/crypto v0.9.0 // indirect
+	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2 // indirect
+	golang.org/x/sys v0.15.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 )
