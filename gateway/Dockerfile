@@ -1,6 +1,6 @@
 FROM --platform=${BUILDPLATFORM:-linux/amd64} ghcr.io/openfaas/license-check:0.4.1 as license-check
 
-FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.19.0 as build
+FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.22.3 as build
 
 ENV GO111MODULE=on
 ENV CGO_ENABLED=0
@@ -20,13 +20,16 @@ WORKDIR /go/src/github.com/dorkamotorka/faas/gateway
 COPY vendor         vendor
 COPY go.mod         go.mod
 COPY go.sum         go.sum
+COPY coldy_bpfeb.o coldy_bpfeb.o
+COPY coldy_bpfel.o coldy_bpfel.o
+COPY coldy_bpfeb.go coldy_bpfeb.go
+COPY coldy_bpfel.go coldy_bpfel.go
 
 COPY handlers       handlers
 COPY metrics        metrics
 COPY requests       requests
 
-COPY xdp	    xdp
-COPY ebpf	    ebpf
+COPY gateway .
 
 COPY types          types
 COPY plugin         plugin

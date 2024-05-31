@@ -6,17 +6,17 @@ package main
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go coldy coldy.c
 
 import (
+	"encoding/binary"
+	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
-	"flag"
 	"time"
-	"encoding/binary"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/link"
+	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
 
 	"github.com/gorilla/mux"
@@ -31,7 +31,7 @@ import (
 	natsHandler "github.com/openfaas/nats-queue-worker/handler"
 )
 
-func event(rd *ringbuf.Reader, s *http.Server, proxy *types.HTTPClientReverseProxy, sai middleware.AuthInjector, scaler scaling.FunctionScaler) {
+func event(rd *ringbuf.Reader, scaler scaling.FunctionScaler) {
 	for {
 		record, err := rd.Read()
 		if err != nil {
@@ -68,7 +68,7 @@ var functionMap = map[int]string{8082: "env"}
 func main() {
 	// Remove resource limits for kernels <5.11.
 	if err := rlimit.RemoveMemlock(); err != nil {
-			log.Fatal("Removing memlock:", err)
+		log.Fatal("Removing memlock:", err)
 	}
 
 	var ifname string
@@ -78,35 +78,47 @@ func main() {
 	// Load the compiled eBPF ELF and load it into the kernel.
 	var objs coldyObjects
 	if err := loadColdyObjects(&objs, nil); err != nil {
-			log.Fatal("Loading eBPF objects:", err)
+		log.Fatal("Loading eBPF objects:", err)
+	} else {
+		log.Println("Successfully loaded eBPF objects!")
 	}
 	defer objs.Close()
 
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
-			log.Fatalf("Getting interface %s: %s", ifname, err)
+		log.Fatalf("Getting interface %s: %s", ifname, err)
 	}
 
 	// Attach XDP program to the network interface.
 	xdplink, err := link.AttachXDP(link.XDPOptions{
-			Program:   objs.XdpIngress,
-			Interface: iface.Index,
+		Program:   objs.XdpIngress,
+		Interface: iface.Index,
 	})
 	if err != nil {
-			log.Fatal("Attaching XDP:", err)
+		log.Fatal("Attaching XDP:", err)
+	} else {
+		log.Println("XDP program should be attached!")
 	}
 	defer xdplink.Close()
+
+	log.Printf("Pinning XDP BPF program")
+	objs.XdpIngress.Pin("/sys/fs/bpf/coldy/xdp")
 
 	// Attach count_packets to the network interface.
 	tclink, err := link.AttachTCX(link.TCXOptions{
 		Program:   objs.TcEgress,
-		Attach:		 ebpf.AttachTCXEgress,
+		Attach:    ebpf.AttachTCXEgress,
 		Interface: iface.Index,
 	})
 	if err != nil {
-			log.Fatal("Attaching TC:", err)
+		log.Fatal("Attaching TC:", err)
+	} else {
+		log.Println("TC program should be attached!")
 	}
 	defer tclink.Close()
+
+	log.Printf("Pinning TC BPF program")
+	objs.TcEgress.Pin("/sys/fs/bpf/coldy/tc")
 
 	log.Printf("Doing port remapping on %s..", ifname)
 
@@ -353,7 +365,7 @@ func main() {
 		Handler:        r,
 	}
 
-	go event(rd, s, reverseProxy, serviceAuthInjector, scaler)
+	go event(rd, scaler)
 	/* BPF event thread */
 
 	fmt.Println(s.ListenAndServe())
